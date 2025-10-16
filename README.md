@@ -11,6 +11,7 @@ A lightweight Xtream Codes API implementation that provides access to VOD (Movie
   <img src="https://github.com/dtankdempsey2/xc-vod-playlist/blob/main/images/movies.PNG" alt="Movies" width="30%" style="margin-right: 5px;"/>
   <img src="https://github.com/dtankdempsey2/xc-vod-playlist/blob/main/images/series.PNG" alt="Series" width="30%"/>
 </p>
+
 ---
 
 ## 📺 Content Sources
