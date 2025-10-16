@@ -9,7 +9,7 @@ const EPISODES_JSON = `${GITHUB_BASE}/episodes.json`;
 const MOVIE_CATS_JSON = `${GITHUB_BASE}/movie_categories.json`;
 const SERIES_CATS_JSON = `${GITHUB_BASE}/series_categories.json`;
 
-const CACHE_TTL = 600; // seconds
+const CACHE_TTL = 86400; // seconds
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
 /* ------------------ helpers ------------------ */
@@ -54,7 +54,7 @@ async function httpGet(url, cache) {
       const age = Date.now() - new Date(cached.headers.get('date') || 0).getTime();
       const maxAge = CACHE_TTL * 1000;
 
-      if (age < 86400000) {
+      if (age < CACHE_TTL * 1000) { // 24 hours (convert seconds to ms)
         log("[cache hit]", url, `age: ${Math.floor(age/1000)}s`);
 
         if (age > maxAge) {
