@@ -9,7 +9,7 @@ const EPISODES_JSON = `${GITHUB_BASE}/episodes.json`;
 const MOVIE_CATS_JSON = `${GITHUB_BASE}/movie_categories.json`;
 const SERIES_CATS_JSON = `${GITHUB_BASE}/series_categories.json`;
 
-const CACHE_TTL = 3600; // seconds
+const CACHE_TTL = 600; // seconds
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
 /* ------------------ helpers ------------------ */
@@ -844,6 +844,29 @@ async function handleSeries(pathname, u, cache) {
   return new Response("Invalid series URL", { status: 400 });
 }
 
+async function handleLive(pathname, cache) {
+  // Parse the URL: /live/{username}/{password}/{stream_id} with optional extension
+  const match = pathname.match(/\/live\/([^/]+)\/([^/]+)\/(\d+)(?:\..*)?$/);
+  if (!match) return new Response("Invalid live URL", { status: 400 });
+
+  const streamId = parseInt(match[3], 10);
+  
+  // Fetch the live streams
+  const includeAdult = false; // or based on config
+  const { streams } = await fetchAndParseLivePlaylist(includeAdult, cache);
+  
+  // Find the stream with matching ID
+  const stream = streams.find(s => s.stream_id === streamId);
+  
+  if (!stream || !stream.direct_source) {
+    return new Response("Stream not found", { status: 404 });
+  }
+  
+  // Redirect to the actual stream URL
+  log("[REDIRECT] live →", stream.direct_source);
+  return Response.redirect(stream.direct_source, 302);
+}
+
 /* ------------------ Main Worker Handler ------------------ */
 
 export default {
@@ -866,21 +889,23 @@ export default {
       let response;
 
 			if (pathname === "/") {
-				response = await handleRoot();
+					response = await handleRoot();
 			} else if (pathname === "/get.php") {
-				response = await handleM3U(request, cache);
+					response = await handleM3U(request, cache);
 			} else if (pathname === "/player_api.php") {
-				response = await handlePlayerAPI(request, cache);
+					response = await handlePlayerAPI(request, cache);
 			} else if (pathname === "/xmltv.php") {
-				return Response.redirect("http://drewlive24.duckdns.org:8081/DrewLive.xml.gz", 302);
+					return Response.redirect("http://drewlive24.duckdns.org:8081/DrewLive.xml.gz", 302);
 			} else if (pathname.startsWith("/movie/")) {
-				const u = pathname.split('/')[2];
-				response = await handleMovie(pathname, u, cache);
+					const u = pathname.split('/')[2];
+					response = await handleMovie(pathname, u, cache);
 			} else if (pathname.startsWith("/series/")) {
-				const u = pathname.split('/')[2];
-				response = await handleSeries(pathname, u, cache);
+					const u = pathname.split('/')[2];
+					response = await handleSeries(pathname, u, cache);
+			} else if (pathname.startsWith("/live/")) {
+					response = await handleLive(pathname, cache);
 			} else {
-				response = new Response("Not Found", { status: 404 });
+					response = new Response("Not Found", { status: 404 });
 			}
 
       const headers = new Headers(response.headers);
@@ -903,4 +928,3 @@ export default {
     }
   },
 };
-
