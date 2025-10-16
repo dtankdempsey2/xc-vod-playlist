@@ -9,7 +9,7 @@ const EPISODES_JSON = `${GITHUB_BASE}/episodes.json`;
 const MOVIE_CATS_JSON = `${GITHUB_BASE}/movie_categories.json`;
 const SERIES_CATS_JSON = `${GITHUB_BASE}/series_categories.json`;
 
-const CACHE_TTL = 600; // seconds
+const CACHE_TTL = 3600; // seconds
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
 /* ------------------ helpers ------------------ */
@@ -903,3 +903,4 @@ export default {
     }
   },
 };
+
