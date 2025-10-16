@@ -1,0 +1,78 @@
+[
+  {
+    "category_id": 28,
+    "category_name": "Action"
+  },
+  {
+    "category_id": 12,
+    "category_name": "Adventure"
+  },
+  {
+    "category_id": 16,
+    "category_name": "Animation"
+  },
+  {
+    "category_id": 35,
+    "category_name": "Comedy"
+  },
+  {
+    "category_id": 80,
+    "category_name": "Crime"
+  },
+  {
+    "category_id": 99,
+    "category_name": "Documentary"
+  },
+  {
+    "category_id": 18,
+    "category_name": "Drama"
+  },
+  {
+    "category_id": 10751,
+    "category_name": "Family"
+  },
+  {
+    "category_id": 14,
+    "category_name": "Fantasy"
+  },
+  {
+    "category_id": 36,
+    "category_name": "History"
+  },
+  {
+    "category_id": 27,
+    "category_name": "Horror"
+  },
+  {
+    "category_id": 10402,
+    "category_name": "Music"
+  },
+  {
+    "category_id": 9648,
+    "category_name": "Mystery"
+  },
+  {
+    "category_id": 10749,
+    "category_name": "Romance"
+  },
+  {
+    "category_id": 878,
+    "category_name": "Science Fiction"
+  },
+  {
+    "category_id": 10770,
+    "category_name": "TV Movie"
+  },
+  {
+    "category_id": 53,
+    "category_name": "Thriller"
+  },
+  {
+    "category_id": 10752,
+    "category_name": "War"
+  },
+  {
+    "category_id": 37,
+    "category_name": "Western"
+  }
+]

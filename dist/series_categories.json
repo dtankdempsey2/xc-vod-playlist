@@ -1,0 +1,66 @@
+[
+  {
+    "category_id": 10759,
+    "category_name": "Action & Adventure"
+  },
+  {
+    "category_id": 16,
+    "category_name": "Animation"
+  },
+  {
+    "category_id": 35,
+    "category_name": "Comedy"
+  },
+  {
+    "category_id": 80,
+    "category_name": "Crime"
+  },
+  {
+    "category_id": 99,
+    "category_name": "Documentary"
+  },
+  {
+    "category_id": 18,
+    "category_name": "Drama"
+  },
+  {
+    "category_id": 10751,
+    "category_name": "Family"
+  },
+  {
+    "category_id": 10762,
+    "category_name": "Kids"
+  },
+  {
+    "category_id": 9648,
+    "category_name": "Mystery"
+  },
+  {
+    "category_id": 10763,
+    "category_name": "News"
+  },
+  {
+    "category_id": 10764,
+    "category_name": "Reality"
+  },
+  {
+    "category_id": 10765,
+    "category_name": "Sci-Fi & Fantasy"
+  },
+  {
+    "category_id": 10766,
+    "category_name": "Soap"
+  },
+  {
+    "category_id": 10767,
+    "category_name": "Talk"
+  },
+  {
+    "category_id": 10768,
+    "category_name": "War & Politics"
+  },
+  {
+    "category_id": 37,
+    "category_name": "Western"
+  }
+]
