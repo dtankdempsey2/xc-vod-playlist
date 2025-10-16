@@ -1,8 +1,8 @@
-// Xtream Codes a111477 VOD Playlist – Cloudflare Worker Edition
+// Xtream Codes VOD Mock – Cloudflare Worker Edition
 // Movies/Series metadata from GitHub, file resolution on-demand
 
 /* ------------------ config ------------------ */
-const GITHUB_BASE = "https://raw.githubusercontent.com/dtanksdempsey/xtream-codes-vod/main/dist";
+const GITHUB_BASE = "https://raw.githubusercontent.com/dtankdempsey2/xc-vod-playlist/main/dist";
 const MOVIES_JSON = `${GITHUB_BASE}/movies.json`;
 const SERIES_JSON = `${GITHUB_BASE}/series.json`;
 const EPISODES_JSON = `${GITHUB_BASE}/episodes.json`;
@@ -902,5 +902,4 @@ export default {
       });
     }
   },
-
 };
