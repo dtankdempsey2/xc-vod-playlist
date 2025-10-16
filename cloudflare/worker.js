@@ -46,36 +46,86 @@ const pendingMovieResolves = new Map();
 const pendingEpisodeResolves = new Map();
 
 async function httpGet(url, cache) {
-  const cacheKey = `http:${url}`;
-  
+  const cacheKey = new Request(url);
+
   if (cache) {
     const cached = await cache.match(cacheKey);
     if (cached) {
-      log("[cache hit]", url);
-      return cached;
+      const age = Date.now() - new Date(cached.headers.get('date') || 0).getTime();
+      const maxAge = CACHE_TTL * 1000;
+
+      if (age < 86400000) {
+        log("[cache hit]", url, `age: ${Math.floor(age/1000)}s`);
+
+        if (age > maxAge) {
+
+          fetch(url, { 
+            headers: { "User-Agent": UA },
+            cf: { cacheTtl: CACHE_TTL, cacheEverything: true }
+          }).then(res => {
+            if (res.ok) {
+              const headers = new Headers(res.headers);
+              headers.set('Cache-Control', `public, max-age=${CACHE_TTL}`);
+              headers.set('Date', new Date().toUTCString());
+              const cachedResponse = new Response(res.body, {
+                status: res.status,
+                statusText: res.statusText,
+                headers
+              });
+              cache.put(cacheKey, cachedResponse);
+            }
+          }).catch(() => {}); 
+        }
+
+        return cached;
+      }
     }
   }
 
-  const res = await fetch(url, { 
-    headers: { "User-Agent": UA },
-    cf: { cacheTtl: CACHE_TTL, cacheEverything: true }
-  });
-  
-  if (!res.ok) throw new Error(`Fetch ${url} -> ${res.status}`);
-  
-  if (cache && res.ok) {
-    const clonedRes = res.clone();
-    const headers = new Headers(clonedRes.headers);
-    headers.set('Cache-Control', `public, max-age=${CACHE_TTL}`);
-    const cachedResponse = new Response(clonedRes.body, {
-      status: clonedRes.status,
-      statusText: clonedRes.statusText,
-      headers
+  try {
+    const res = await fetch(url, { 
+      headers: { "User-Agent": UA },
+      cf: { cacheTtl: CACHE_TTL, cacheEverything: true }
     });
-    await cache.put(cacheKey, cachedResponse);
+
+    if (!res.ok) {
+      log(`[fetch error] ${url} -> ${res.status}`);
+
+      if (cache) {
+        const stale = await cache.match(cacheKey);
+        if (stale) {
+          log("[serving stale due to upstream error]", url);
+          return stale;
+        }
+      }
+      throw new Error(`Fetch ${url} -> ${res.status}`);
+    }
+
+    if (cache) {
+      const headers = new Headers(res.headers);
+      headers.set('Cache-Control', `public, max-age=${CACHE_TTL}`);
+      headers.set('Date', new Date().toUTCString());
+      const cachedResponse = new Response(res.clone().body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers
+      });
+      await cache.put(cacheKey, cachedResponse);
+    }
+
+    return res;
+  } catch (e) {
+    log("[fetch error]", url, e.message);
+
+    if (cache) {
+      const stale = await cache.match(cacheKey);
+      if (stale) {
+        log("[serving stale due to fetch error]", url);
+        return stale;
+      }
+    }
+    throw e;
   }
-  
-  return res;
 }
 
 async function fetchJSON(url, cache) {
@@ -83,7 +133,7 @@ async function fetchJSON(url, cache) {
     const res = await httpGet(url, cache);
     return await res.json();
   } catch (e) {
-    log("[fetchJSON] error:", e.message);
+    log("[fetchJSON] error:", url, e.message);
     return [];
   }
 }
