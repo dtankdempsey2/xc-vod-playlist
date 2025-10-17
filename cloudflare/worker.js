@@ -45,92 +45,31 @@ function channelIdFromName(name) {
 const pendingMovieResolves = new Map();
 const pendingEpisodeResolves = new Map();
 
-async function httpGet(url, cache) {
-  const cacheKey = new Request(url);
-
-  if (cache) {
-    const cached = await cache.match(cacheKey);
-    if (cached) {
-      const age = Date.now() - new Date(cached.headers.get('date') || 0).getTime();
-      const maxAge = CACHE_TTL * 1000;
-
-      if (age < 86400000) {
-        log("[cache hit]", url, `age: ${Math.floor(age/1000)}s`);
-
-        if (age > maxAge) {
-
-          fetch(url, { 
-            headers: { "User-Agent": UA },
-            cf: { cacheTtl: CACHE_TTL, cacheEverything: true }
-          }).then(res => {
-            if (res.ok) {
-              const headers = new Headers(res.headers);
-              headers.set('Cache-Control', `public, max-age=${CACHE_TTL}`);
-              headers.set('Date', new Date().toUTCString());
-              const cachedResponse = new Response(res.body, {
-                status: res.status,
-                statusText: res.statusText,
-                headers
-              });
-              cache.put(cacheKey, cachedResponse);
-            }
-          }).catch(() => {}); 
-        }
-
-        return cached;
-      }
-    }
-  }
-
+async function httpGet(url) {
   try {
     const res = await fetch(url, { 
       headers: { "User-Agent": UA },
-      cf: { cacheTtl: CACHE_TTL, cacheEverything: true }
+      cf: { 
+        cacheTtl: CACHE_TTL, 
+        cacheEverything: true 
+      }
     });
 
     if (!res.ok) {
       log(`[fetch error] ${url} -> ${res.status}`);
-
-      if (cache) {
-        const stale = await cache.match(cacheKey);
-        if (stale) {
-          log("[serving stale due to upstream error]", url);
-          return stale;
-        }
-      }
       throw new Error(`Fetch ${url} -> ${res.status}`);
-    }
-
-    if (cache) {
-      const headers = new Headers(res.headers);
-      headers.set('Cache-Control', `public, max-age=${CACHE_TTL}`);
-      headers.set('Date', new Date().toUTCString());
-      const cachedResponse = new Response(res.clone().body, {
-        status: res.status,
-        statusText: res.statusText,
-        headers
-      });
-      await cache.put(cacheKey, cachedResponse);
     }
 
     return res;
   } catch (e) {
     log("[fetch error]", url, e.message);
-
-    if (cache) {
-      const stale = await cache.match(cacheKey);
-      if (stale) {
-        log("[serving stale due to fetch error]", url);
-        return stale;
-      }
-    }
     throw e;
   }
 }
 
-async function fetchJSON(url, cache) {
+async function fetchJSON(url) {
   try {
-    const res = await httpGet(url, cache);
+    const res = await httpGet(url);
     return await res.json();
   } catch (e) {
     log("[fetchJSON] error:", url, e.message);
@@ -201,10 +140,10 @@ function selectFile(files, targetSizeGB = null) {
   return files[0].url;
 }
 
-async function findSmallestFile(folderUrl, maxSizeGB = null, cache) {
+async function findSmallestFile(folderUrl, maxSizeGB = null) {
   try {
     log("[findSmallestFile] fetching:", folderUrl);
-    const res = await httpGet(folderUrl, cache);
+    const res = await httpGet(folderUrl);
     const html = await res.text();
     const files = parseFileTable(html);
     
@@ -222,7 +161,7 @@ async function findSmallestFile(folderUrl, maxSizeGB = null, cache) {
   }
 }
 
-async function getEpisodeUrl(seriesItem, seasonNum, episodeNum, episodesData, maxSizeGB = null, cache) {
+async function getEpisodeUrl(seriesItem, seasonNum, episodeNum, episodesData, maxSizeGB = null) {
   try {
     // Find the episode in episodes.json
     const episodeEntry = episodesData.find(
@@ -245,7 +184,7 @@ async function getEpisodeUrl(seriesItem, seasonNum, episodeNum, episodesData, ma
     const seasonUrl = `${seriesItem.folder_url}Season ${seasonNum}/`;
     
     // Fetch season folder to get episode files
-    const res = await httpGet(seasonUrl, cache);
+    const res = await httpGet(seasonUrl);
     const html = await res.text();
     
     // Parse episode files
@@ -293,13 +232,13 @@ async function getEpisodeUrl(seriesItem, seasonNum, episodeNum, episodesData, ma
   }
 }
 
-async function fetchAndParseLivePlaylist(includeAdult = false, cache) {
+async function fetchAndParseLivePlaylist(includeAdult = false) {
   const playlistUrl = includeAdult
     ? 'https://raw.githubusercontent.com/Drewski2423/DrewLive/refs/heads/main/MergedPlaylist.m3u8'
     : 'https://raw.githubusercontent.com/Drewski2423/DrewLive/refs/heads/main/MergedCleanPlaylist.m3u8';
 
   try {
-    const res = await httpGet(playlistUrl, cache);
+    const res = await httpGet(playlistUrl);
     let playlist = await res.text();
     
     const lines = playlist.split('\n');
@@ -395,7 +334,7 @@ Endpoints:
 `, { headers: { "Content-Type": "text/plain" } });
 }
 
-async function handleM3U(request, cache) {
+async function handleM3U(request) {
   const url = new URL(request.url);
   const type = (url.searchParams.get("type") || "").toLowerCase();
   
@@ -404,8 +343,8 @@ async function handleM3U(request, cache) {
   }
 
   const base = `${url.protocol}//${url.host}`;
-  const movies = await fetchJSON(MOVIES_JSON, cache);
-  const categories = await fetchJSON(MOVIE_CATS_JSON, cache);
+  const movies = await fetchJSON(MOVIES_JSON);
+  const categories = await fetchJSON(MOVIE_CATS_JSON);
 
   const sortedCategories = categories.sort((a, b) => 
     (a.category_name || "").localeCompare(b.category_name || "")
@@ -433,7 +372,7 @@ async function handleM3U(request, cache) {
   });
 }
 
-async function handlePlayerAPI(request, cache) {
+async function handlePlayerAPI(request) {
   const url = new URL(request.url);
   const action = (url.searchParams.get("action") || "").toLowerCase();
 
@@ -503,7 +442,7 @@ async function handlePlayerAPI(request, cache) {
 
 	if (action === "get_live_categories") {
 		const includeAdult = false;
-		const { categories } = await fetchAndParseLivePlaylist(includeAdult, cache);
+		const { categories } = await fetchAndParseLivePlaylist(includeAdult);
 		
 		return new Response(JSON.stringify([
 			{ category_id: "0", category_name: "All", parent_id: 0 },
@@ -515,7 +454,7 @@ async function handlePlayerAPI(request, cache) {
 		const requestedCat = Number(url.searchParams.get("category_id") ?? 0);
 		const includeAdult = false;
 		
-		const { streams } = await fetchAndParseLivePlaylist(includeAdult, cache);
+		const { streams } = await fetchAndParseLivePlaylist(includeAdult);
 		
 		let filtered = streams;
 		if (requestedCat !== 0) {
@@ -528,7 +467,7 @@ async function handlePlayerAPI(request, cache) {
 	}
 
   if (action === "get_vod_categories") {
-    const cats = await fetchJSON(MOVIE_CATS_JSON, cache);
+    const cats = await fetchJSON(MOVIE_CATS_JSON);
     const sorted = cats.sort((a, b) => 
       (a.category_name || "").localeCompare(b.category_name || "")
     );
@@ -540,7 +479,7 @@ async function handlePlayerAPI(request, cache) {
 
   if (action === "get_vod_streams") {
     const requestedCat = Number(url.searchParams.get("category_id") ?? 0);
-    const movies = await fetchJSON(MOVIES_JSON, cache);
+    const movies = await fetchJSON(MOVIES_JSON);
 
     let filtered = movies;
     if (requestedCat !== 0) {
@@ -580,7 +519,7 @@ async function handlePlayerAPI(request, cache) {
       });
     }
 
-    const movies = await fetchJSON(MOVIES_JSON, cache);
+    const movies = await fetchJSON(MOVIES_JSON);
     const movie = movies.find((m) => String(m.stream_id) === String(vodId));
     
     if (!movie) {
@@ -597,7 +536,7 @@ async function handlePlayerAPI(request, cache) {
     if (pendingMovieResolves.has(resolveKey)) {
       fileUrl = await pendingMovieResolves.get(resolveKey);
     } else {
-      const promise = findSmallestFile(movie.folder_url, maxSizeGB, cache)
+      const promise = findSmallestFile(movie.folder_url, maxSizeGB)
         .finally(() => pendingMovieResolves.delete(resolveKey));
       
       pendingMovieResolves.set(resolveKey, promise);
@@ -634,7 +573,7 @@ async function handlePlayerAPI(request, cache) {
   }
 
   if (action === "get_series_categories") {
-    const cats = await fetchJSON(SERIES_CATS_JSON, cache);
+    const cats = await fetchJSON(SERIES_CATS_JSON);
     const sorted = cats.sort((a, b) => 
       (a.category_name || "").localeCompare(b.category_name || "")
     );
@@ -646,7 +585,7 @@ async function handlePlayerAPI(request, cache) {
 
   if (action === "get_series") {
     const requestedCat = Number(url.searchParams.get("category_id") ?? 0);
-    const seriesList = await fetchJSON(SERIES_JSON, cache);
+    const seriesList = await fetchJSON(SERIES_JSON);
 
     let filtered = seriesList;
     if (requestedCat !== 0) {
@@ -688,7 +627,7 @@ async function handlePlayerAPI(request, cache) {
       });
     }
 
-    const seriesList = await fetchJSON(SERIES_JSON, cache);
+    const seriesList = await fetchJSON(SERIES_JSON);
     const series = seriesList.find((s) => String(s.series_id) === String(seriesId));
     
     if (!series) {
@@ -699,7 +638,7 @@ async function handlePlayerAPI(request, cache) {
     }
 
     // Load episodes from episodes.json
-    const episodesData = await fetchJSON(EPISODES_JSON, cache);
+    const episodesData = await fetchJSON(EPISODES_JSON);
     const seriesEpisodes = episodesData.filter(ep => ep.tmdb_id === series.tmdb_id);
 
     // Build episodes structure
@@ -778,12 +717,12 @@ async function handlePlayerAPI(request, cache) {
   });
 }
 
-async function handleMovie(pathname, u, cache) {
+async function handleMovie(pathname, u) {
   const match = pathname.match(/\/movie\/([^/]+)\/([^/]+)\/(\d+)(?:\.[^/]+)?$/);
   if (!match) return new Response("Invalid movie URL", { status: 400 });
 
   const id = match[3];
-  const movies = await fetchJSON(MOVIES_JSON, cache);
+  const movies = await fetchJSON(MOVIES_JSON);
   const movie = movies.find((m) => String(m.stream_id) === String(id));
   
   if (!movie) return new Response("movie not found", { status: 404 });
@@ -795,7 +734,7 @@ async function handleMovie(pathname, u, cache) {
   if (pendingMovieResolves.has(resolveKey)) {
     fileUrl = await pendingMovieResolves.get(resolveKey);
   } else {
-    const promise = findSmallestFile(movie.folder_url, maxSizeGB, cache)
+    const promise = findSmallestFile(movie.folder_url, maxSizeGB)
       .finally(() => pendingMovieResolves.delete(resolveKey));
     
     pendingMovieResolves.set(resolveKey, promise);
@@ -808,7 +747,7 @@ async function handleMovie(pathname, u, cache) {
   return Response.redirect(fileUrl, 302);
 }
 
-async function handleSeries(pathname, u, cache) {
+async function handleSeries(pathname, u) {
   // Try modern format first: /series/u/p/episode_id.ext (where ext is base64)
   let match = pathname.match(/\/series\/([^/]+)\/([^/]+)\/(\d+)\.([^/]+)$/);
   
@@ -826,18 +765,18 @@ async function handleSeries(pathname, u, cache) {
       const maxSizeGB = parseFilesize(u);
       const epKey = `${series_id}_${seasonNum}_${episodeNum}_${maxSizeGB || 'min'}`;
 
-      const seriesList = await fetchJSON(SERIES_JSON, cache);
+      const seriesList = await fetchJSON(SERIES_JSON);
       const series = seriesList.find((s) => s.series_id === series_id);
       
       if (!series) return new Response("series not found", { status: 404 });
 
-      const episodesData = await fetchJSON(EPISODES_JSON, cache);
+      const episodesData = await fetchJSON(EPISODES_JSON);
 
       let epUrl;
       if (pendingEpisodeResolves.has(epKey)) {
         epUrl = await pendingEpisodeResolves.get(epKey);
       } else {
-        const promise = getEpisodeUrl(series, seasonNum, episodeNum, episodesData, maxSizeGB, cache)
+        const promise = getEpisodeUrl(series, seasonNum, episodeNum, episodesData, maxSizeGB)
           .finally(() => pendingEpisodeResolves.delete(epKey));
 
         pendingEpisodeResolves.set(epKey, promise);
@@ -864,21 +803,21 @@ async function handleSeries(pathname, u, cache) {
     const seasonNum = Math.floor(remainder / 100);
     const episodeNum = remainder % 100;
 
-    const maxSizeGB = parseMaxFilesize(u);
+    const maxSizeGB = parseFilesize(u);
     const epKey = `${series_id}_${seasonNum}_${episodeNum}_${maxSizeGB || 'min'}`;
 
-    const seriesList = await fetchJSON(SERIES_JSON, cache);
+    const seriesList = await fetchJSON(SERIES_JSON);
     const series = seriesList.find((s) => String(s.series_id) === String(series_id));
     
     if (!series) return new Response("series not found", { status: 404 });
 
-    const episodesData = await fetchJSON(EPISODES_JSON, cache);
+    const episodesData = await fetchJSON(EPISODES_JSON);
 
     let epUrl;
     if (pendingEpisodeResolves.has(epKey)) {
       epUrl = await pendingEpisodeResolves.get(epKey);
     } else {
-      const promise = getEpisodeUrl(series, seasonNum, episodeNum, episodesData, maxSizeGB, cache)
+      const promise = getEpisodeUrl(series, seasonNum, episodeNum, episodesData, maxSizeGB)
         .finally(() => pendingEpisodeResolves.delete(epKey));
 
       pendingEpisodeResolves.set(epKey, promise);
@@ -894,7 +833,7 @@ async function handleSeries(pathname, u, cache) {
   return new Response("Invalid series URL", { status: 400 });
 }
 
-async function handleLive(pathname, cache) {
+async function handleLive(pathname) {
   // Parse the URL: /live/{username}/{password}/{stream_id} with optional extension
   const match = pathname.match(/\/live\/([^/]+)\/([^/]+)\/(\d+)(?:\..*)?$/);
   if (!match) return new Response("Invalid live URL", { status: 400 });
@@ -903,7 +842,7 @@ async function handleLive(pathname, cache) {
   
   // Fetch the live streams
   const includeAdult = false; // or based on config
-  const { streams } = await fetchAndParseLivePlaylist(includeAdult, cache);
+  const { streams } = await fetchAndParseLivePlaylist(includeAdult);
   
   // Find the stream with matching ID
   const stream = streams.find(s => s.stream_id === streamId);
@@ -923,7 +862,6 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const pathname = url.pathname;
-    const cache = caches.default;
 
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
@@ -941,19 +879,19 @@ export default {
 			if (pathname === "/") {
 					response = await handleRoot();
 			} else if (pathname === "/get.php") {
-					response = await handleM3U(request, cache);
+					response = await handleM3U(request);
 			} else if (pathname === "/player_api.php") {
-					response = await handlePlayerAPI(request, cache);
+					response = await handlePlayerAPI(request);
 			} else if (pathname === "/xmltv.php") {
 					return Response.redirect("http://drewlive24.duckdns.org:8081/DrewLive.xml.gz", 302);
 			} else if (pathname.startsWith("/movie/")) {
 					const u = pathname.split('/')[2];
-					response = await handleMovie(pathname, u, cache);
+					response = await handleMovie(pathname, u);
 			} else if (pathname.startsWith("/series/")) {
 					const u = pathname.split('/')[2];
-					response = await handleSeries(pathname, u, cache);
+					response = await handleSeries(pathname, u);
 			} else if (pathname.startsWith("/live/")) {
-					response = await handleLive(pathname, cache);
+					response = await handleLive(pathname);
 			} else {
 					response = new Response("Not Found", { status: 404 });
 			}
