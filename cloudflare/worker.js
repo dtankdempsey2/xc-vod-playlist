@@ -9,7 +9,7 @@ const EPISODES_JSON = `${GITHUB_BASE}/episodes.json`;
 const MOVIE_CATS_JSON = `${GITHUB_BASE}/movie_categories.json`;
 const SERIES_CATS_JSON = `${GITHUB_BASE}/series_categories.json`;
 
-const CACHE_TTL = 86400; // seconds
+const CACHE_TTL = 600; // seconds
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
 /* ------------------ helpers ------------------ */
@@ -46,86 +46,36 @@ const pendingMovieResolves = new Map();
 const pendingEpisodeResolves = new Map();
 
 async function httpGet(url, cache) {
-  const cacheKey = new Request(url);
-
+  const cacheKey = `http:${url}`;
+  
   if (cache) {
     const cached = await cache.match(cacheKey);
     if (cached) {
-      const age = Date.now() - new Date(cached.headers.get('date') || 0).getTime();
-      const maxAge = CACHE_TTL * 1000;
-
-      if (age < CACHE_TTL * 1000) { // 24 hours (convert seconds to ms)
-        log("[cache hit]", url, `age: ${Math.floor(age/1000)}s`);
-
-        if (age > maxAge) {
-
-          fetch(url, { 
-            headers: { "User-Agent": UA },
-            cf: { cacheTtl: CACHE_TTL, cacheEverything: true }
-          }).then(res => {
-            if (res.ok) {
-              const headers = new Headers(res.headers);
-              headers.set('Cache-Control', `public, max-age=${CACHE_TTL}`);
-              headers.set('Date', new Date().toUTCString());
-              const cachedResponse = new Response(res.body, {
-                status: res.status,
-                statusText: res.statusText,
-                headers
-              });
-              cache.put(cacheKey, cachedResponse);
-            }
-          }).catch(() => {}); 
-        }
-
-        return cached;
-      }
+      log("[cache hit]", url);
+      return cached;
     }
   }
 
-  try {
-    const res = await fetch(url, { 
-      headers: { "User-Agent": UA },
-      cf: { cacheTtl: CACHE_TTL, cacheEverything: true }
+  const res = await fetch(url, { 
+    headers: { "User-Agent": UA },
+    cf: { cacheTtl: CACHE_TTL, cacheEverything: true }
+  });
+  
+  if (!res.ok) throw new Error(`Fetch ${url} -> ${res.status}`);
+  
+  if (cache && res.ok) {
+    const clonedRes = res.clone();
+    const headers = new Headers(clonedRes.headers);
+    headers.set('Cache-Control', `public, max-age=${CACHE_TTL}`);
+    const cachedResponse = new Response(clonedRes.body, {
+      status: clonedRes.status,
+      statusText: clonedRes.statusText,
+      headers
     });
-
-    if (!res.ok) {
-      log(`[fetch error] ${url} -> ${res.status}`);
-
-      if (cache) {
-        const stale = await cache.match(cacheKey);
-        if (stale) {
-          log("[serving stale due to upstream error]", url);
-          return stale;
-        }
-      }
-      throw new Error(`Fetch ${url} -> ${res.status}`);
-    }
-
-    if (cache) {
-      const headers = new Headers(res.headers);
-      headers.set('Cache-Control', `public, max-age=${CACHE_TTL}`);
-      headers.set('Date', new Date().toUTCString());
-      const cachedResponse = new Response(res.clone().body, {
-        status: res.status,
-        statusText: res.statusText,
-        headers
-      });
-      await cache.put(cacheKey, cachedResponse);
-    }
-
-    return res;
-  } catch (e) {
-    log("[fetch error]", url, e.message);
-
-    if (cache) {
-      const stale = await cache.match(cacheKey);
-      if (stale) {
-        log("[serving stale due to fetch error]", url);
-        return stale;
-      }
-    }
-    throw e;
+    await cache.put(cacheKey, cachedResponse);
   }
+  
+  return res;
 }
 
 async function fetchJSON(url, cache) {
@@ -133,7 +83,7 @@ async function fetchJSON(url, cache) {
     const res = await httpGet(url, cache);
     return await res.json();
   } catch (e) {
-    log("[fetchJSON] error:", url, e.message);
+    log("[fetchJSON] error:", e.message);
     return [];
   }
 }
