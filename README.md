@@ -52,6 +52,10 @@ Deploy your own instance in under **2 minutes** using **Cloudflare's free tier**
 
 ## 🛠️ Option 2: Manual Deployment (No GitHub Required)
 
+### 📺 Setup Video
+
+https://github.com/user-attachments/assets/6da1cb9b-79d6-45ba-87ba-8ddb8867fe0a
+
 If you prefer to set it up manually, follow these steps:
 
 1. **Sign up for Cloudflare**  
