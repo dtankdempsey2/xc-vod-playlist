@@ -2,14 +2,13 @@
 // Movies/Series metadata from GitHub, file resolution on-demand
 
 /* ------------------ config ------------------ */
-const GITHUB_BASE = "https://raw.githubusercontent.com/dtankdempsey2/xc-vod-playlist/main/dist";
+const GITHUB_BASE = "https://xc-vod-files.pages.dev";
 const MOVIES_JSON = `${GITHUB_BASE}/movies.json`;
 const SERIES_JSON = `${GITHUB_BASE}/series.json`;
 const EPISODES_JSON = `${GITHUB_BASE}/episodes.json`;
 const MOVIE_CATS_JSON = `${GITHUB_BASE}/movie_categories.json`;
 const SERIES_CATS_JSON = `${GITHUB_BASE}/series_categories.json`;
 
-const CACHE_TTL = 600; // seconds
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
 /* ------------------ helpers ------------------ */
@@ -46,25 +45,13 @@ const pendingMovieResolves = new Map();
 const pendingEpisodeResolves = new Map();
 
 async function httpGet(url) {
-  try {
-    const res = await fetch(url, { 
-      headers: { "User-Agent": UA },
-      cf: { 
-        cacheTtl: CACHE_TTL, 
-        cacheEverything: true 
-      }
-    });
-
-    if (!res.ok) {
-      log(`[fetch error] ${url} -> ${res.status}`);
-      throw new Error(`Fetch ${url} -> ${res.status}`);
-    }
-
-    return res;
-  } catch (e) {
-    log("[fetch error]", url, e.message);
-    throw e;
-  }
+  const res = await fetch(url, { 
+    headers: { "User-Agent": UA }
+  });
+  
+  if (!res.ok) throw new Error(`Fetch ${url} -> ${res.status}`);
+  
+  return res;
 }
 
 async function fetchJSON(url) {
@@ -72,7 +59,7 @@ async function fetchJSON(url) {
     const res = await httpGet(url);
     return await res.json();
   } catch (e) {
-    log("[fetchJSON] error:", url, e.message);
+    log("[fetchJSON] error:", e.message);
     return [];
   }
 }
@@ -833,29 +820,6 @@ async function handleSeries(pathname, u) {
   return new Response("Invalid series URL", { status: 400 });
 }
 
-async function handleLive(pathname) {
-  // Parse the URL: /live/{username}/{password}/{stream_id} with optional extension
-  const match = pathname.match(/\/live\/([^/]+)\/([^/]+)\/(\d+)(?:\..*)?$/);
-  if (!match) return new Response("Invalid live URL", { status: 400 });
-
-  const streamId = parseInt(match[3], 10);
-  
-  // Fetch the live streams
-  const includeAdult = false; // or based on config
-  const { streams } = await fetchAndParseLivePlaylist(includeAdult);
-  
-  // Find the stream with matching ID
-  const stream = streams.find(s => s.stream_id === streamId);
-  
-  if (!stream || !stream.direct_source) {
-    return new Response("Stream not found", { status: 404 });
-  }
-  
-  // Redirect to the actual stream URL
-  log("[REDIRECT] live →", stream.direct_source);
-  return Response.redirect(stream.direct_source, 302);
-}
-
 /* ------------------ Main Worker Handler ------------------ */
 
 export default {
@@ -877,23 +841,21 @@ export default {
       let response;
 
 			if (pathname === "/") {
-					response = await handleRoot();
+				response = await handleRoot();
 			} else if (pathname === "/get.php") {
-					response = await handleM3U(request);
+				response = await handleM3U(request);
 			} else if (pathname === "/player_api.php") {
-					response = await handlePlayerAPI(request);
+				response = await handlePlayerAPI(request);
 			} else if (pathname === "/xmltv.php") {
-					return Response.redirect("http://drewlive24.duckdns.org:8081/DrewLive.xml.gz", 302);
+				return Response.redirect("http://drewlive24.duckdns.org:8081/DrewLive.xml.gz", 302);
 			} else if (pathname.startsWith("/movie/")) {
-					const u = pathname.split('/')[2];
-					response = await handleMovie(pathname, u);
+				const u = pathname.split('/')[2];
+				response = await handleMovie(pathname, u);
 			} else if (pathname.startsWith("/series/")) {
-					const u = pathname.split('/')[2];
-					response = await handleSeries(pathname, u);
-			} else if (pathname.startsWith("/live/")) {
-					response = await handleLive(pathname);
+				const u = pathname.split('/')[2];
+				response = await handleSeries(pathname, u);
 			} else {
-					response = new Response("Not Found", { status: 404 });
+				response = new Response("Not Found", { status: 404 });
 			}
 
       const headers = new Headers(response.headers);
